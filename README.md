@@ -2,7 +2,7 @@
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
-Testing was done with the [fastcheck](https://github.com/dubzzz/fast-check) testing library.
+Testing was done with the [fastcheck]()
 
 ## How to Run
 
