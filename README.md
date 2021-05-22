@@ -1,8 +1,14 @@
-# Tools Used
+# Overview
+
+This is a sample project using Type Driven Development in TypeScript. The project is a small React App that uses websockets to connect to an open port, listen to and receive json data from said port, and displays that data to the user.
+
+## Tools Used
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
-Testing was done with the [fastcheck]()
+We make use of the [WebSocket API](https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API) as well as the MVU style [reducer pattern](https://blog.logrocket.com/guide-to-react-usereducer-hook/) in React.
+
+Testing was done with the [fastcheck](https://github.com/dubzzz/fast-check) testing framework.
 
 ## How to Run
 
