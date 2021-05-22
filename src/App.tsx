@@ -4,6 +4,7 @@ import Controller from "./Controller"
 import * as C from "./Controller"
 import { Result } from "./Result"
 import * as R from "./Result"
+import { WSconnection } from "./WebSocket"
 
 /*
 
@@ -87,6 +88,7 @@ const reducer = (state: State, action: Action): State => {
 }
 
 /* VIEW */
+
 function App() {
   const [state, dispatch] = useReducer(reducer, initialState)
 
@@ -135,7 +137,7 @@ function App() {
 
 const tryCreateSocket = (url: string, dispatch: (_: Action) => void): Result<WebSocket> => {
   try {
-    const connection = new WebSocket(url)
+    const connection = WSconnection.getInstance(url)
     connection.onopen = function (e: Event) {
       console.log("Opened")
     }
