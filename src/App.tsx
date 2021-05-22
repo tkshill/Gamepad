@@ -1,10 +1,16 @@
-import React, { useReducer } from "react"
+import React, { useEffect, useReducer } from "react"
 import "./App.css"
 import Controller from "./Controller"
 import * as C from "./Controller"
 import { Result } from "./Result"
+import * as R from "./Result"
 
-//'ws://127.0.0.1:5678'
+/*
+
+Main Application model for the Gamepad project. Contains the core app view and
+state management logic.
+
+*/
 
 /* DOMAIN */
 
@@ -14,9 +20,11 @@ type State = {
   socket: Socket
 }
 
-type Socket = Connected | Errored | Closed
+type Socket = Closed | Awaiting | Connected | Closing | Errored
+type Awaiting = { status: "Awaiting" }
 type Closed = { status: "ClosedSocket" }
-type Connected = { status: "Connected"; websocket: WebSocket }
+type Connected = { status: "Connected"; connection: WebSocket }
+type Closing = { status: "Closing"; connection: WebSocket }
 type Errored = { status: "SocketError"; error: string }
 
 /* INIT */
@@ -29,19 +37,22 @@ const initialState: State = {
 
 /* Action */
 
-type ConnectButtonClicked = {
-  type: "ConnectButtonClicked"
-  handler: (dispatch: Action) => void
-}
+type ConnectButtonClicked = { type: "ConnectButtonClicked"; handler: (dispatch: Action) => void }
 type ReceivedPayload = { type: "PayloadReceived"; value: Result<Controller> }
 type InputUpdated = { type: "InputUpdated"; value: string }
+type SuccessfulConnection = { type: "SuccessfulConnection"; value: WebSocket }
+type FailedConnection = { type: "FailedConnection"; value: string }
 type DisconnectButtonClicked = { type: "DisconnectButtonClicked" }
+type SocketClosed = { type: "SocketClosed" }
 
 type Action =
   | ReceivedPayload
   | InputUpdated
   | ConnectButtonClicked
   | DisconnectButtonClicked
+  | SuccessfulConnection
+  | FailedConnection
+  | SocketClosed
 
 /* UPDATE */
 
@@ -50,18 +61,18 @@ const reducer = (state: State, action: Action): State => {
     case "InputUpdated":
       return { ...state, url: action.value }
     case "ConnectButtonClicked":
-      const newSocket = tryCreateSocket(state.url, action.handler)
-      return { ...state, socket: newSocket }
+      return { ...state, socket: { status: "Awaiting" } }
+    case "SuccessfulConnection":
+      return { ...state, socket: { status: "Connected", connection: action.value } }
+    case "FailedConnection":
+      return { ...state, socket: { status: "ClosedSocket" } }
     case "DisconnectButtonClicked":
       switch (state.socket.status) {
-        case "ClosedSocket":
-        case "SocketError":
-          return state
         case "Connected":
-          state.socket.websocket.close()
-          return { ...state, socket: { status: "ClosedSocket" } }
+          return { ...state, socket: { status: "Closing", connection: state.socket.connection } }
+        default:
+          return state
       }
-      break
     case "PayloadReceived":
       switch (action.value.isOk) {
         case true:
@@ -69,6 +80,9 @@ const reducer = (state: State, action: Action): State => {
         case false:
           return state
       }
+      break
+    case "SocketClosed":
+      return { ...state, socket: { status: "ClosedSocket" } }
   }
 }
 
@@ -76,57 +90,68 @@ const reducer = (state: State, action: Action): State => {
 function App() {
   const [state, dispatch] = useReducer(reducer, initialState)
 
+  useEffect(() => {
+    switch (state.socket.status) {
+      case "Awaiting":
+        const result = tryCreateSocket(state.url, dispatch)
+        switch (result.isOk) {
+          case true:
+            dispatch({
+              type: "SuccessfulConnection",
+              value: result.value,
+            })
+            break
+          case false:
+            dispatch({ type: "FailedConnection", value: result.error })
+        }
+        break
+      case "Closing":
+        state.socket.connection.close()
+        dispatch({ type: "SocketClosed" })
+    }
+  }, [state.socket])
+
   return (
     <form action="">
       <input
         type="text"
         value={state.url}
         placeholder="wss://homework.rain.gg:8765"
-        onChange={e =>
-          dispatch({ type: "InputUpdated", value: e.target.value })
-        }
+        onChange={e => dispatch({ type: "InputUpdated", value: e.target.value })}
       />
       <button
         type="button"
-        onClick={_ =>
-          dispatch({ type: "ConnectButtonClicked", handler: dispatch })
-        }
+        onClick={_ => dispatch({ type: "ConnectButtonClicked", handler: dispatch })}
       >
         Connect
       </button>
-      <button
-        type="button"
-        onClick={_ => dispatch({ type: "DisconnectButtonClicked" })}
-      >
+      <button type="button" onClick={_ => dispatch({ type: "DisconnectButtonClicked" })}>
         Disconnect
       </button>
+      <input value={state.controller.sticks[0].position.x.value} />
     </form>
   )
 }
 
-const tryCreateSocket = (
-  url: string,
-  dispatch: (_: Action) => void
-): Socket => {
+const tryCreateSocket = (url: string, dispatch: (_: Action) => void): Result<WebSocket> => {
   try {
-    var connection = new WebSocket(url)
-    connection.onclose = function (_) {
-      console.log("Connection closed")
+    const connection = new WebSocket(url)
+    connection.onopen = function (e: Event) {
+      console.log("Opened")
     }
     connection.onmessage = function (e: MessageEvent<string>) {
       dispatch({
         type: "PayloadReceived",
         value: C.parseJSON(JSON.parse(e.data)),
       })
-      console.log(e.data, typeof e.data)
     }
-    return { status: "Connected", websocket: connection }
-  } catch (error) {
-    console.log(error)
-    return {
-      status: "SocketError",
-      error: "Could not connect to socket: " + error,
+    connection.onclose = function (e: CloseEvent) {
+      console.log(e.code)
     }
+    return R.ok(connection)
+  } catch (e) {
+    console.log(e)
+    return R.error(e)
   }
 }
 
