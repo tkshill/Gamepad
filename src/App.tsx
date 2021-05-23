@@ -1,4 +1,4 @@
-import React, { useEffect, useReducer } from "react"
+import React, { DependencyList, useEffect, useReducer } from "react"
 import "./App.css"
 import Controller from "./Controller"
 import * as C from "./Controller"
@@ -28,7 +28,7 @@ type Connected = { status: "Connected"; connection: WebSocket }
 type Closing = { status: "Closing"; connection: WebSocket }
 type Errored = { status: "SocketError"; error: string }
 
-/* INIT */
+/* InitialState */
 
 const initialState: State = {
   url: "",
@@ -36,7 +36,7 @@ const initialState: State = {
   controller: C.initController,
 }
 
-/* Action */
+/* ACTIONS */
 
 type ConnectButtonClicked = { type: "ConnectButtonClicked"; handler: (dispatch: Action) => void }
 type ReceivedPayload = { type: "PayloadReceived"; value: Result<Controller> }
@@ -55,7 +55,7 @@ type Action =
   | FailedConnection
   | SocketClosed
 
-/* UPDATE */
+/* UPDATES */
 
 const reducer = (state: State, action: Action): State => {
   switch (action.type) {
@@ -87,12 +87,55 @@ const reducer = (state: State, action: Action): State => {
   }
 }
 
-/* VIEW */
+/* VIEWS */
 
-function App() {
-  const [state, dispatch] = useReducer(reducer, initialState)
+const view = (state: State, dispatch: (_: Action) => void): JSX.Element => {
+  const buttons = state.controller.buttons.map(viewControllerButton)
+  const sticks = state.controller.sticks.map(viewControllerStick)
 
-  useEffect(() => {
+  return (
+    <div>
+      <form action="">
+        <label htmlFor="SocketUrlInput">Enter Websocket Url Here</label>
+        <input
+          type="text"
+          id="SocketUrlInput"
+          value={state.url}
+          placeholder="wss://homework.rain.gg:8765"
+          onChange={e => dispatch({ type: "InputUpdated", value: e.target.value })}
+        />
+        <button
+          type="button"
+          onClick={_ => dispatch({ type: "ConnectButtonClicked", handler: dispatch })}
+        >
+          Connect
+        </button>
+        <button type="button" onClick={_ => dispatch({ type: "DisconnectButtonClicked" })}>
+          Disconnect
+        </button>
+        <input value={state.controller.sticks[0].position.x.value} />
+      </form>
+      <div>{buttons}</div>
+      <div>{sticks}</div>
+    </div>
+  )
+}
+
+const viewControllerButton = (button: C.Button) => (
+  <div className="{button.name} {button.status}">{button.name}</div>
+)
+
+const viewControllerStick = (stick: C.Stick) => (
+  <div className="{stick.name}">{[stick.name, stick.position.x.value, stick.position.y.value]}</div>
+)
+
+/* EFFECTS */
+
+const socketPayloadEffect = (
+  state: State,
+  dispatch: (_: Action) => void
+): [React.EffectCallback, DependencyList] => {
+  const effect = () => {
     switch (state.socket.status) {
       case "Awaiting":
         const result = tryCreateSocket(state.url, dispatch)
@@ -111,29 +154,26 @@ function App() {
         state.socket.connection.close()
         dispatch({ type: "SocketClosed" })
     }
-  }, [state.socket])
+  }
 
-  return (
-    <form action="">
-      <input
-        type="text"
-        value={state.url}
-        placeholder="wss://homework.rain.gg:8765"
-        onChange={e => dispatch({ type: "InputUpdated", value: e.target.value })}
-      />
-      <button
-        type="button"
-        onClick={_ => dispatch({ type: "ConnectButtonClicked", handler: dispatch })}
-      >
-        Connect
-      </button>
-      <button type="button" onClick={_ => dispatch({ type: "DisconnectButtonClicked" })}>
-        Disconnect
-      </button>
-      <input value={state.controller.sticks[0].position.x.value} />
-    </form>
-  )
+  const dependencyList = [state.socket]
+
+  return [effect, dependencyList]
 }
+
+/* APPLICATION */
+
+function App() {
+  const [state, dispatch] = useReducer(reducer, initialState)
+
+  const [receivePayload, dependencyList] = socketPayloadEffect(state, dispatch)
+
+  useEffect(receivePayload, dependencyList)
+
+  return view(state, dispatch)
+}
+
+/* HELPER FUNCS */
 
 const tryCreateSocket = (url: string, dispatch: (_: Action) => void): Result<WebSocket> => {
   try {

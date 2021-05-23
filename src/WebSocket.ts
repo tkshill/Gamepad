@@ -10,6 +10,7 @@ create more than one connection on the same url
 */
 
 export class WSconnection extends WebSocket {
+  //singleton wrapper over WebSocket
   private static instance?: WSconnection
   private static url?: string
 
