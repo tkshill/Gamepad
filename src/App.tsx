@@ -5,6 +5,7 @@ import * as C from "./Controller"
 import { Result } from "./Result"
 import * as R from "./Result"
 import { WSconnection } from "./WebSocket"
+import { StringLiteral } from "typescript"
 
 /*
 
@@ -19,6 +20,7 @@ type State = {
   url: string
   controller: Controller
   socket: Socket
+  status: string
 }
 
 type Socket = Closed | Awaiting | Connected | Closing | Errored
@@ -36,6 +38,7 @@ const initialState: State = {
   url: "",
   socket: { status: "ClosedSocket" },
   controller: C.initController,
+  status: "No connection currently",
 }
 
 /* ACTIONS */
@@ -67,18 +70,34 @@ const reducer = (state: State, action: Action): State => {
       switch (state.socket.status) {
         case "ClosedSocket":
         case "SocketError":
-          return { ...state, socket: { status: "Awaiting" } }
+          return {
+            ...state,
+            socket: { status: "Awaiting" },
+            status: "Attempting to connect to socket.",
+          }
         default:
-          return { ...state }
+          return { ...state, status: "Cannot connect to socket right now." }
       }
     case "SuccessfulConnection":
-      return { ...state, socket: { status: "Connected", connection: action.value } }
+      return {
+        ...state,
+        socket: { status: "Connected", connection: action.value },
+        status: "Socket connected, listening for controller data.",
+      }
     case "FailedConnection":
-      return { ...state, socket: { status: "ClosedSocket" } }
+      return {
+        ...state,
+        socket: { status: "ClosedSocket" },
+        status: "Failed to connect to socket.",
+      }
     case "DisconnectButtonClicked":
       switch (state.socket.status) {
         case "Connected":
-          return { ...state, socket: { status: "Closing", connection: state.socket.connection } }
+          return {
+            ...state,
+            socket: { status: "Closing", connection: state.socket.connection },
+            status: "Disconnecting from socket.",
+          }
         default:
           return state
       }
@@ -91,7 +110,11 @@ const reducer = (state: State, action: Action): State => {
       }
       break
     case "SocketClosed":
-      return { ...state, socket: { status: "ClosedSocket" } }
+      return {
+        ...state,
+        socket: { status: "ClosedSocket" },
+        status: "Socket closed. No socket connected.",
+      }
   }
 }
 
@@ -128,6 +151,7 @@ const FormView = (props: StateParams): JSX.Element => (
       placeholder="wss://homework.rain.gg:8765"
       onChange={e => props.dispatch({ type: "InputUpdated", value: e.target.value })}
     />
+    <div>{props.state.status}</div>
 
     <div id="form-buttons">
       <button type="button" onClick={_ => props.dispatch({ type: "ConnectButtonClicked" })}>
@@ -215,9 +239,6 @@ const tryCreateSocket = (url: string, dispatch: (_: Action) => void): Result<Web
         type: "PayloadReceived",
         value: C.parseJSON(JSON.parse(e.data)),
       })
-    }
-    connection.onclose = function (e: CloseEvent) {
-      console.log(e.code)
     }
     return R.ok(connection)
   } catch (e) {
