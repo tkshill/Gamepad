@@ -10,7 +10,10 @@ We make use of the [WebSocket API](https://developer.mozilla.org/en-US/docs/Web/
 
 ## Future Goals:
 
-- Do property-based testing with the [fastcheck](https://github.com/dubzzz/fast-check) testing framework.
+- Do property-based testing with the [fastcheck](https://github.com/dubzzz/fast-check) testing framework to ensure json conversion is working correctly
+- Make styling that doesn't suck. Design is *not* my forte. I'm very slow and steady.
+- Better accessibility
+
 
 ## How to Run
 
