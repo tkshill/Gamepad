@@ -22,11 +22,13 @@ type State = {
 }
 
 type Socket = Closed | Awaiting | Connected | Closing | Errored
-type Awaiting = { status: "Awaiting" }
+type Awaiting = { status: "Awaiting"; connection?: WebSocket }
 type Closed = { status: "ClosedSocket" }
 type Connected = { status: "Connected"; connection: WebSocket }
 type Closing = { status: "Closing"; connection: WebSocket }
 type Errored = { status: "SocketError"; error: string }
+
+type StateParams = { state: State; dispatch: (_: Action) => void }
 
 /* InitialState */
 
@@ -38,7 +40,7 @@ const initialState: State = {
 
 /* ACTIONS */
 
-type ConnectButtonClicked = { type: "ConnectButtonClicked"; handler: (dispatch: Action) => void }
+type ConnectButtonClicked = { type: "ConnectButtonClicked" }
 type ReceivedPayload = { type: "PayloadReceived"; value: Result<Controller> }
 type InputUpdated = { type: "InputUpdated"; value: string }
 type SuccessfulConnection = { type: "SuccessfulConnection"; value: WebSocket }
@@ -62,7 +64,13 @@ const reducer = (state: State, action: Action): State => {
     case "InputUpdated":
       return { ...state, url: action.value }
     case "ConnectButtonClicked":
-      return { ...state, socket: { status: "Awaiting" } }
+      switch (state.socket.status) {
+        case "ClosedSocket":
+        case "SocketError":
+          return { ...state, socket: { status: "Awaiting" } }
+        default:
+          return { ...state }
+      }
     case "SuccessfulConnection":
       return { ...state, socket: { status: "Connected", connection: action.value } }
     case "FailedConnection":
@@ -89,45 +97,66 @@ const reducer = (state: State, action: Action): State => {
 
 /* VIEWS */
 
-const view = (state: State, dispatch: (_: Action) => void): JSX.Element => {
-  const buttons = state.controller.buttons.map(viewControllerButton)
-  const sticks = state.controller.sticks.map(viewControllerStick)
+const MainView = (props: StateParams): JSX.Element => {
+  const buttons = props.state.controller.buttons.map(ControllerButtonView)
+  const sticks = props.state.controller.sticks.map(ControllerStickView)
 
   return (
-    <div>
-      <form action="">
-        <label htmlFor="SocketUrlInput">Enter Websocket Url Here</label>
-        <input
-          type="text"
-          id="SocketUrlInput"
-          value={state.url}
-          placeholder="wss://homework.rain.gg:8765"
-          onChange={e => dispatch({ type: "InputUpdated", value: e.target.value })}
-        />
-        <button
-          type="button"
-          onClick={_ => dispatch({ type: "ConnectButtonClicked", handler: dispatch })}
-        >
-          Connect
-        </button>
-        <button type="button" onClick={_ => dispatch({ type: "DisconnectButtonClicked" })}>
-          Disconnect
-        </button>
-        <input value={state.controller.sticks[0].position.x.value} />
-      </form>
-      <div>{buttons}</div>
-      <div>{sticks}</div>
+    <div id="main-container">
+      <header>
+        <h1>React GamePad Example</h1>
+      </header>
+      <main id="main-content">
+        <FormView state={props.state} dispatch={props.dispatch} />
+        <div id="controller">
+          <div id="sticks">{sticks}</div>
+          <div id="buttons">{buttons}</div>
+        </div>
+      </main>
+      <footer>Created by Kirk Shillingford</footer>
     </div>
   )
 }
 
-const viewControllerButton = (button: C.Button) => (
-  <div className="{button.name} {button.status}">{button.name}</div>
+const FormView = (props: StateParams): JSX.Element => (
+  <form id="form-content" action="">
+    <label htmlFor="SocketUrlInput">Enter Websocket Url Here</label>
+    <input
+      type="text"
+      id="SocketUrlInput"
+      value={props.state.url}
+      placeholder="wss://homework.rain.gg:8765"
+      onChange={e => props.dispatch({ type: "InputUpdated", value: e.target.value })}
+    />
+
+    <div id="form-buttons">
+      <button type="button" onClick={_ => props.dispatch({ type: "ConnectButtonClicked" })}>
+        Connect
+      </button>
+      <button type="button" onClick={_ => props.dispatch({ type: "DisconnectButtonClicked" })}>
+        Disconnect
+      </button>
+    </div>
+  </form>
 )
 
-const viewControllerStick = (stick: C.Stick) => (
-  <div className="{stick.name}">{[stick.name, stick.position.x.value, stick.position.y.value]}</div>
+const ControllerButtonView = (cbutton: C.Button) => (
+  <div id={cbutton.name} className={`contbutton ${cbutton.status}`}>
+    {cbutton.name}
+  </div>
 )
+
+const ControllerStickView = (stick: C.Stick) => {
+  const xshift = `${stick.position.x.value * 100}%`
+  const yshift = `${stick.position.y.value * 100}%`
+
+  const divStyle = { transform: `translate(${xshift}, ${yshift})` }
+  return (
+    <div id={stick.name} className="stick" style={divStyle}>
+      {stick.name}
+    </div>
+  )
+}
 
 /* EFFECTS */
 
@@ -170,7 +199,7 @@ function App() {
 
   useEffect(receivePayload, dependencyList)
 
-  return view(state, dispatch)
+  return <MainView state={state} dispatch={dispatch} />
 }
 
 /* HELPER FUNCS */
