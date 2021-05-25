@@ -5,7 +5,6 @@ import * as C from "./Controller"
 import { Result } from "./Result"
 import * as R from "./Result"
 import { WSconnection } from "./WebSocket"
-import { StringLiteral } from "typescript"
 
 /*
 

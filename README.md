@@ -8,7 +8,9 @@ This project was bootstrapped with [Create React App](https://github.com/faceboo
 
 We make use of the [WebSocket API](https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API) as well as the MVU style [reducer pattern](https://blog.logrocket.com/guide-to-react-usereducer-hook/) in React.
 
-Testing was done with the [fastcheck](https://github.com/dubzzz/fast-check) testing framework.
+## Future Goals:
+
+- Do property-based testing with the [fastcheck](https://github.com/dubzzz/fast-check) testing framework.
 
 ## How to Run
 
